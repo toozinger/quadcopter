@@ -1,15 +1,28 @@
-int led = 13;
+#include <Servo.h> 
+Servo motor_one;
+Servo motor_two;
+Servo motor_three;
+Servo motor_four;
 
-// the setup routine runs once when you press reset:
-void setup() {                
-    // initialize the digital pin as an output.
-    pinMode(led, OUTPUT);     
-}
+void setup() { 
+    motor_one.attach(8); 
+    motor_two.attach(9);
+    motor_three.attach(10);
+    motor_four.attach(11);
 
-// the loop routine runs over and over again forever:
+    motor_one.write(20);
+    motor_two.write(20);
+    motor_three.write(20);
+    motor_four.write(20);
+    delay(1000);
+
+    int power = 20;
+
+    motor_one.write(power);
+    motor_two.write(power);
+    motor_three.write(power);
+    motor_four.write(power);
+} 
+ 
 void loop() {
-    digitalWrite(led, HIGH);   // turn the LED on (HIGH is the voltage level)
-    delay(1000);               // wait for a second
-    digitalWrite(led, LOW);    // turn the LED off by making the voltage LOW
-    delay(1000);               // wait for a second
 }
