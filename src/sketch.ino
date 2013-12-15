@@ -20,8 +20,8 @@ void setup() {
 
     motor_one.write(power);
     motor_two.write(power);
-    motor_three.write(power);
-    motor_four.write(power);
+    // motor_three.write(power);
+    // motor_four.write(power);
 } 
  
 void loop() {
