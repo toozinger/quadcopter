@@ -24,10 +24,11 @@ PID::PID(double* Input, double* Output, double* Setpoint,
     myOutput = Output;
     myInput = Input;
     mySetpoint = Setpoint;
-	inAuto = false;
+	  inAuto = false;
 	
-	PID::SetOutputLimits(0, 255);				//default output limit corresponds to 
-												//the arduino pwm limits
+	  PID::SetOutputLimits(0, 255);				//default output limit corresponds to 
+				  								              //the arduino pwm limits
+    PID::SetInputLimits(0, 1024);       //default input limits are 0 to 1024.
 
     SampleTime = 100;							//default Controller Sample Time is 0.1 seconds
 
@@ -52,8 +53,25 @@ bool PID::Compute()
    if(timeChange>=SampleTime)
    {
       /*Compute all the working error variables*/
-	  double input = *myInput;
+      if(*myInput > inMax) *myInput = inMax;
+      else if(*myInput < inMin) *myInput = inMin;
+	    double input = *myInput;
       double error = *mySetpoint - input;
+      if (isContinuous) // If we are continuous
+      {
+          if (fabs(error) > (inMax - inMin) / 2)
+          {
+            if (error > 0)
+            {
+              error = error - inMax + inMin;
+            }
+            else
+            {
+              error = error + inMax - inMin;
+            }
+          }
+      }
+
       ITerm+= (ki * error);
       if(ITerm > outMax) ITerm= outMax;
       else if(ITerm < outMin) ITerm= outMin;
@@ -136,6 +154,36 @@ void PID::SetOutputLimits(double Min, double Max)
 	   if(ITerm > outMax) ITerm= outMax;
 	   else if(ITerm < outMin) ITerm= outMin;
    }
+}
+
+/* SetInputLimits(...)****************************************************
+ *     This function will be used less than SetOutputLimits.    While the
+ * input is typically within the default range of 0-1023 range sometimes
+ * (especially when the input is continuous) it is necessary to set the
+ * input range as well.  That can be done here.
+ **************************************************************************/
+void PID::SetInputLimits(double Min, double Max)
+{
+   if(Min >= Max) return;
+   inMin = Min;
+   inMax = Max;
+ 
+   if(inAuto)
+   {
+     if(*myInput > inMax) *myInput = inMax;
+     else if(*myInput < inMin) *myInput = inMin;
+   }
+}
+
+/* SetContinuous(...)****************************************************
+ *     Sets if the input is continuous.  That is, if the minimum and maximum
+ * input values are the same physical configuration, and it is legal to pass
+ * from the minimum to the maximum directly then the PID can be continuous.
+ * Hint: Good for rotational inputs.
+ **************************************************************************/
+void PID::SetContinuous(bool Continuous)
+{
+   is_continuous = Continuous;
 }
 
 /* SetMode(...)****************************************************************
