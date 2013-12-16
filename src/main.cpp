@@ -5,7 +5,7 @@
 #include "main.h"
 #include "sensors.h"
 
-Servo motor_one;
+Servo *motor_one=0;
 
 // OUTPUT OPTIONS
 /*****************************************************************/
@@ -23,8 +23,8 @@ Servo motor_one;
 /*****************************************************************/
 
 double Setpoint, Input, Output;
-// Make the pic                       P, I, D
-PID myPID(&Input, &Output, &Setpoint, 2, 5, 1, DIRECT);
+PID *myPID=0;
+
 
 void setup() {
     // Init serial output
@@ -45,14 +45,20 @@ void setup() {
     // Set the PID to seek pitch 0
     Setpoint = 0;
 
+    // Make the pid                       P, I, D
+    myPID = new PID(&Input, &Output, &Setpoint, 2, 5, 1, DIRECT);
+
+    //Make motor one
+    motor_one = new Servo();
+
     // Turn the pid on
-    myPID.SetMode(AUTOMATIC);
+    myPID->SetMode(AUTOMATIC);
     // Set the PIds limits
-    myPID.SetOutputLimits(40, 120);
+    myPID->SetOutputLimits(40, 120);
  
-    motor_one.attach(10);
+    motor_one->attach(10);
     
-    motor_one.write(20);
+    motor_one->write(20);
     delay(5000);
 }
 
@@ -87,9 +93,9 @@ void loop() {
         
         
         Input = TO_DEG(pitch);
-        myPID.Compute();
+        myPID->Compute();
         Serial.print("speed: "); Serial.print(Output/2); Serial.print(";    "); Serial.println();
-        motor_one.write(Output/2);
+        motor_one->write(Output/2);
         
         delay(20);
     }
