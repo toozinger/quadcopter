@@ -35,7 +35,9 @@ PID::PID(double* Input, double* Output, double* Setpoint,
     PID::SetControllerDirection(ControllerDirection);
     PID::SetTunings(Kp, Ki, Kd);
 
-    lastTime = millis()-SampleTime;				
+    lastTime = millis()-SampleTime;	
+    isContinuous = false;	
+    lastDInput = -1;		
 }
  
  
@@ -53,8 +55,8 @@ bool PID::Compute()
    if(timeChange>=SampleTime)
    {
       /*Compute all the working error variables*/
-      if(*myInput > inMax) *myInput = inMax;
-      else if(*myInput < inMin) *myInput = inMin;
+      // if(*myInput > inMax) *myInput = inMax;
+      // else if(*myInput < inMin) *myInput = inMin;
 	    double input = *myInput;
       double error = *mySetpoint - input;
       if (isContinuous) // If we are continuous
@@ -76,6 +78,10 @@ bool PID::Compute()
       if(ITerm > outMax) ITerm= outMax;
       else if(ITerm < outMin) ITerm= outMin;
       double dInput = (input - lastInput);
+      if (lastDInput != -1) {
+        // dInput = dInput * 0.75 + lastDInput * 0.25;
+      }
+      lastDInput = dInput;
  
       /*Compute PID Output*/
       double output = kp * error + ITerm- kd * dInput;
@@ -183,7 +189,7 @@ void PID::SetInputLimits(double Min, double Max)
  **************************************************************************/
 void PID::SetContinuous(bool Continuous)
 {
-   is_continuous = Continuous;
+   isContinuous = Continuous;
 }
 
 /* SetMode(...)****************************************************************

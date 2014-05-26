@@ -79,6 +79,7 @@ class PID
 			  
 	unsigned long lastTime;
 	double ITerm, lastInput;
+	double lastDInput;
 
 	unsigned long SampleTime;
 	double outMin, outMax;

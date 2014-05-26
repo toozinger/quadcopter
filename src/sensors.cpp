@@ -1,9 +1,3 @@
-#include <Arduino.h>
-#include <Wire.h>
-#include <I2C.h> // I2C for the sensor libs
-#include <L3G4200D.h> // The gyro lib
-#include <Adafruit_BMP085.h> // The barometric pressure lib
-
 #include "sensors.h"
 
 // SENSOR CALIBRATION
@@ -97,52 +91,54 @@
 #define TO_RAD(x) (x * 0.01745329252)    // *pi/180
 #define TO_DEG(x) (x * 57.2957795131)    // *180/pi
 
-// RAW sensor data
-float accel[3];    // Actually stores the NEGATED acceleration (equals gravity, if board not moving).
-//float accel_min[3];
-//float accel_max[3];
+KalmanFilter::KalmanFilter() {
 
-float magnetom[3];
-//float magnetom_min[3];
-//float magnetom_max[3];
+}
 
-float gyro[3];
-//float gyro_average[3];
-//int gyro_num_samples = 0;
+KalmanFilter::~KalmanFilter() {
 
-float temperature;
-float pressure;
-float altitude;
+}
 
-// DCM variables
-float MAG_Heading;
-float Magn_Vector[3]= {0, 0, 0}; // Store the magnetometer turn rate in a vector
-float Accel_Vector[3]= {0, 0, 0}; // Store the acceleration in a vector
-float Gyro_Vector[3]= {0, 0, 0}; // Store the gyros turn rate in a vector
-float Omega_Vector[3]= {0, 0, 0}; // Corrected Gyro_Vector data
-float Omega_P[3]= {0, 0, 0}; // Omega Proportional correction
-float Omega_I[3]= {0, 0, 0}; // Omega Integrator
-float Omega[3]= {0, 0, 0};
-float errorRollPitch[3] = {0, 0, 0};
-float errorYaw[3] = {0, 0, 0};
-float DCM_Matrix[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
-float Update_Matrix[3][3] = {{0, 1, 2}, {3, 4, 5}, {6, 7, 8}};
-float Temporary_Matrix[3][3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+void KalmanFilter::Compute() {
+    // Time to read the sensors again?
+    if ((millis() - sensorTimestamp) >= OUTPUT_DATA_INTERVAL) {
+        sensorTimestamp = millis();
+        ReadSensors();
+        Compass_Heading(); // Calculate magnetic heading
+    }   
 
-// More output-state variables
-int num_accel_errors = 0;
-int num_magn_errors = 0;
-int num_gyro_errors = 0;
+    timestamp_old = timestamp;
+    timestamp = millis();
+    if (timestamp > timestamp_old)
+        G_Dt = (float) (timestamp - timestamp_old) / 1000.0f; // Real time of loop run. We use this on the DCM algorithm (gyro integration time)
+    else
+        G_Dt = 0;
 
-float yaw;
-float pitch;
-float roll;
-long timestamp;
-long timestamp_old;
-float G_Dt;
+    // Run DCM algorithm
+    Matrix_update();
+    Normalize();
+    Drift_correction();
+    Euler_angles();
+}
+
+void KalmanFilter::SetupSensors() {
+    // Init sensors
+    Serial.println("Waiting for sensors to boot...");
+    delay(50);    // Give sensors enough time to start
+    I2C_Init();
+    Accel_Init();
+    Magn_Init();
+    Gyro_Init();
+    Pressure_Init();
+    
+    Serial.println("Waiting for sensor data...");
+    // Read sensors, init DCM algorithm
+    delay(20);    // Give sensors enough time to collect data
+    reset_sensor_fusion();
+}
 
 // Computes the dot product of two vectors
-float Vector_Dot_Product(float vector1[3], float vector2[3])
+float KalmanFilter::Vector_Dot_Product(float vector1[3], float vector2[3])
 {
     float op=0;
     
@@ -155,7 +151,7 @@ float Vector_Dot_Product(float vector1[3], float vector2[3])
 }
 
 // Computes the cross product of two vectors
-void Vector_Cross_Product(float vectorOut[3], float v1[3], float v2[3])
+void KalmanFilter::Vector_Cross_Product(float vectorOut[3], float v1[3], float v2[3])
 {
     vectorOut[0]= (v1[1]*v2[2]) - (v1[2]*v2[1]);
     vectorOut[1]= (v1[2]*v2[0]) - (v1[0]*v2[2]);
@@ -163,7 +159,7 @@ void Vector_Cross_Product(float vectorOut[3], float v1[3], float v2[3])
 }
 
 // Multiply the vector by a scalar. 
-void Vector_Scale(float vectorOut[3], float vectorIn[3], float scale2)
+void KalmanFilter::Vector_Scale(float vectorOut[3], float vectorIn[3], float scale2)
 {
     for(int c=0; c<3; c++)
     {
@@ -172,7 +168,7 @@ void Vector_Scale(float vectorOut[3], float vectorIn[3], float scale2)
 }
 
 // Adds two vectors
-void Vector_Add(float vectorOut[3], float vectorIn1[3], float vectorIn2[3])
+void KalmanFilter::Vector_Add(float vectorOut[3], float vectorIn1[3], float vectorIn2[3])
 {
     for(int c=0; c<3; c++)
     {
@@ -181,7 +177,7 @@ void Vector_Add(float vectorOut[3], float vectorIn1[3], float vectorIn2[3])
 }
 
 //Multiply two 3x3 matrixs. This function developed by Jordi can be easily adapted to multiple n*n matrix's. (Pero me da flojera!). 
-void Matrix_Multiply(float a[3][3], float b[3][3],float mat[3][3])
+void KalmanFilter::Matrix_Multiply(float a[3][3], float b[3][3],float mat[3][3])
 {
     float op[3]; 
     for(int x=0; x<3; x++)
@@ -200,7 +196,7 @@ void Matrix_Multiply(float a[3][3], float b[3][3],float mat[3][3])
     }
 }
 
-void Matrix_update(void)
+void KalmanFilter::Matrix_update(void)
 {    
     Vector_Add(&Omega[0], &Gyro_Vector[0], &Omega_I[0]);    //adding proportional term
     Vector_Add(&Omega_Vector[0], &Omega[0], &Omega_P[0]); //adding Integrator term
@@ -238,14 +234,14 @@ void Matrix_update(void)
     }
 }
 
-void Euler_angles(void)
+void KalmanFilter::Euler_angles(void)
 {
     pitch = -asin(DCM_Matrix[2][0]);
-    roll = atan2(DCM_Matrix[2][1],DCM_Matrix[2][2]);
+    roll = 1.5707963+atan2(DCM_Matrix[2][1],DCM_Matrix[2][2]);
     yaw = atan2(DCM_Matrix[1][0],DCM_Matrix[0][0]);
 }
 
-void Normalize(void)
+void KalmanFilter::Normalize(void)
 {
     float error=0;
     float temporary[3][3];
@@ -271,7 +267,7 @@ void Normalize(void)
     Vector_Scale(&DCM_Matrix[2][0], &temporary[2][0], renorm);
 }
 
-void Drift_correction(void)
+void KalmanFilter::Drift_correction(void)
 {
     float mag_heading_x;
     float mag_heading_y;
@@ -295,7 +291,7 @@ void Drift_correction(void)
     Vector_Cross_Product(&errorRollPitch[0],&Accel_Vector[0],&DCM_Matrix[2][0]); //adjust the ground of reference
     Vector_Scale(&Omega_P[0],&errorRollPitch[0],Kp_ROLLPITCH*Accel_weight);
     
-    Vector_Scale(&Scaled_Omega_I[0],&errorRollPitch[0],Ki_ROLLPITCH*Accel_weight);
+    Vector_Scale(&Scaled_Omega_I[0],&errorRollPitch[0],Ki_ROLLPITCH*Accel_weight * (G_Dt/.02)); // Scale integration
     Vector_Add(Omega_I,Omega_I,Scaled_Omega_I);         
     
     //*****YAW***************
@@ -309,12 +305,12 @@ void Drift_correction(void)
     Vector_Scale(&Scaled_Omega_P[0],&errorYaw[0],Kp_YAW);//.01proportional of YAW.
     Vector_Add(Omega_P,Omega_P,Scaled_Omega_P);//Adding    Proportional.
     
-    Vector_Scale(&Scaled_Omega_I[0],&errorYaw[0],Ki_YAW);//.00001Integrator
+    Vector_Scale(&Scaled_Omega_I[0],&errorYaw[0],Ki_YAW * (G_Dt/.02));//.00001Integrator
     Vector_Add(Omega_I,Omega_I,Scaled_Omega_I);//adding integrator to the Omega_I
 }
 
 // Init rotation matrix using euler angles
-void init_rotation_matrix(float m[3][3], float yaw, float pitch, float roll)
+void KalmanFilter::init_rotation_matrix(float m[3][3], float yaw, float pitch, float roll)
 {
     float c1 = cos(roll);
     float s1 = sin(roll);
@@ -351,12 +347,12 @@ void init_rotation_matrix(float m[3][3], float yaw, float pitch, float roll)
 #define WIRE_SEND(b) Wire.write((byte) b) 
 #define WIRE_RECEIVE() Wire.read() 
 
-void I2C_Init()
+void KalmanFilter::I2C_Init()
 {
     Wire.begin();
 }
 
-void Accel_Init()
+void KalmanFilter::Accel_Init()
 {
     Wire.beginTransmission(ACCEL_ADDRESS);
     WIRE_SEND(0x2D);    // Power register
@@ -378,7 +374,7 @@ void Accel_Init()
 }
 
 // Reads x, y and z accelerometer registers
-void Read_Accel()
+void KalmanFilter::Read_Accel()
 {
     int i = 0;
     byte buff[6];
@@ -408,7 +404,7 @@ void Read_Accel()
     }
 }
 
-void Magn_Init()
+void KalmanFilter::Magn_Init()
 {
     Wire.beginTransmission(MAGN_ADDRESS);
     WIRE_SEND(0x02); 
@@ -423,7 +419,7 @@ void Magn_Init()
     delay(5);
 }
 
-void Read_Magn()
+void KalmanFilter::Read_Magn()
 {
     int i = 0;
     byte buff[6];
@@ -454,11 +450,7 @@ void Read_Magn()
     }
 }
 
-
-
-L3G4200D gyroscope;
-
-void Gyro_Init()
+void KalmanFilter::Gyro_Init()
 {
     gyroscope.enableDefault();
     gyroscope.writeReg(L3G4200D_CTRL_REG1, 0x0F); // normal power mode, all axes enabled, 100 Hz
@@ -466,7 +458,7 @@ void Gyro_Init()
 }
 
 // Reads x, y and z gyroscope registers
-void Read_Gyro()
+void KalmanFilter::Read_Gyro()
 {
     gyroscope.read();
     gyro[0] = gyroscope.g.x;
@@ -474,13 +466,11 @@ void Read_Gyro()
     gyro[2] = gyroscope.g.z;
 }
 
-Adafruit_BMP085 press;
-
-void Pressure_Init() {
+void KalmanFilter::Pressure_Init() {
     press.begin(BMP085_ULTRALOWPOWER);
 }
 
-void Read_Pressure() {
+void KalmanFilter::Read_Pressure() {
     //press.update();
     temperature = press.readTemperature();
     pressure = 0.01f * press.readPressure();
@@ -490,7 +480,7 @@ void Read_Pressure() {
 
 
 // Apply calibration to raw sensor readings
-void ApplySensorMapping()
+void KalmanFilter::ApplySensorMapping()
 {
         // Magnetometer axis mapping
         Magn_Vector[1] = -magnetom[0];
@@ -532,7 +522,7 @@ void ApplySensorMapping()
         Gyro_Vector[2] *= GYRO_Z_SCALE;
 }
 
-void Compass_Heading()
+void KalmanFilter::Compass_Heading()
 {
     float mag_x;
     float mag_y;
@@ -554,7 +544,7 @@ void Compass_Heading()
     MAG_Heading = atan2(-mag_y, mag_x);
 }
 
-void ReadSensors() {
+void KalmanFilter::ReadSensors() {
     Read_Pressure();
     Read_Gyro(); // Read gyroscope
     Read_Accel(); // Read accelerometer
@@ -565,7 +555,7 @@ void ReadSensors() {
 // Read every sensor and record a time stamp
 // Init DCM with unfiltered orientation
 // TODO re-init global vars?
-void reset_sensor_fusion()
+void KalmanFilter::reset_sensor_fusion()
 {
     float temp1[3];
     float temp2[3];
@@ -574,6 +564,7 @@ void reset_sensor_fusion()
     ReadSensors();
     
     timestamp = millis();
+    sensorTimestamp = millis();
     
     // GET PITCH
     // Using y-z-plane-component/x-component of gravity vector
