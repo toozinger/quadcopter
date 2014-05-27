@@ -1,7 +1,6 @@
 #ifndef __AVIONICS_H
 #define __AVIONICS_H
 
-#include "sensors.h"
 #include <Servo.h>
 #include <PID_v1.h>
 
@@ -10,6 +9,9 @@
 #define TO_DEG(x) (x * 57.2957795131)    // *180/pi
 
 #define MOTOR_ZERO (20)
+
+class Sensors;
+class FreeIMU;
 
 class Avionics
 {
@@ -31,7 +33,8 @@ public:
 	double vAcc_Input;
 	double vAcc_Output;
 
-	KalmanFilter *sensors;
+	Sensors *sensors;
+	FreeIMU *imu;
 	
 public:
 	double pitch_Setpoint;

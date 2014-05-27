@@ -2,6 +2,9 @@
 #include <Arduino.h>
 #include <math.h>
 
+#include "sensors/sensors.h"
+#include "sensors/kalman/Kalman.h"
+
 Avionics::Avionics(){
 
 }
@@ -11,8 +14,12 @@ Avionics::~Avionics() {
 }
 
 void Avionics::setup() {
-	sensors = new KalmanFilter();
-	sensors->SetupSensors();
+    delay(50);
+	sensors = new Sensors();
+	sensors->setupSensors();
+
+    imu = new FreeIMU(sensors);
+    imu->init();
 
     Serial.println("Starting ESCs...");
     motor_pitch_plus = new Servo();
@@ -32,7 +39,7 @@ void Avionics::setup() {
 
     motor_roll_plus->write(MOTOR_ZERO);
     motor_roll_minus->write(MOTOR_ZERO);
-    delay(2000);
+    // delay(2000);
 
     Serial.println("ESCs Started");
 
@@ -45,25 +52,44 @@ void Avionics::setup() {
 	pitch_Setpoint = 0;
 }
 
+float ypr[3];
+
 void Avionics::update() {
 	vAcc_Output = 47;
-	sensors->Compute();
-	pitch_Input = sensors->pitch;
-	roll_Input = sensors->roll;
+	imu->getEuler(ypr);
+    // Pitch, yaw, roll
+    
+    // Serial.print(sensors->accel.x);
+    // Serial.print("  ,  ");
+    // Serial.print(sensors->accel.y);
+    // Serial.print("  ,  ");
+    // Serial.print(sensors->accel.z);
+    // Serial.print("  ,  ");
+    // Serial.println();
+    Serial.print(ypr[0]);
+    Serial.print("  ,  ");
+    Serial.print(ypr[1]);
+    Serial.print("  ,  ");
+    Serial.print(ypr[2]);
+    Serial.print("  ,  ");
+    Serial.println();
+
+	// pitch_Input = sensors->pitch;
+	// roll_Input = sensors->roll;
 
 
 	// Slow correction
 
-	if (pitchPID->Compute()) {
-		if (fabs(pitch_Input - pitch_Setpoint) < TO_RAD(5)) { // 
-			pitch_Output *= 0.5;
-		}
-		Serial.print("In: "); Serial.print(pitch_Input);
-		Serial.print(";    Out: ");Serial.println(pitch_Output);
-		// motor_pitch_plus->write(vAcc_Output + pitch_Output);
-		// motor_pitch_minus->write(vAcc_Output - pitch_Output);
+	// if (pitchPID->Compute()) {
+	// 	if (fabs(pitch_Input - pitch_Setpoint) < TO_RAD(5)) { // 
+	// 		pitch_Output *= 0.5;
+	// 	}
+	// 	Serial.print("In: "); Serial.print(pitch_Input);
+	// 	Serial.print(";    Out: ");Serial.println(pitch_Output);
+	// 	// motor_pitch_plus->write(vAcc_Output + pitch_Output);
+	// 	// motor_pitch_minus->write(vAcc_Output - pitch_Output);
 
-		// motor_roll_minus->write(vAcc_Output);
-		// motor_roll_plus->write(vAcc_Output);
-	}
+	// 	// motor_roll_minus->write(vAcc_Output);
+	// 	// motor_roll_plus->write(vAcc_Output);
+	// }
 }
