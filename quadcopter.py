@@ -1,6 +1,8 @@
 #!/usr/bin/python2
 import sys
 import subprocess
+board="mega2560"
+#board="uno"
 
 # If no args are present, print usage and exit
 if len(sys.argv) <= 1:
@@ -34,8 +36,8 @@ for command in commands:
     if command == "c":
         subprocess.call(["ino", "clean"], stderr=subprocess.STDOUT)
     if command == "b":
-        subprocess.call(["ino", "build"], stderr=subprocess.STDOUT)
+        subprocess.call(["ino", "build", "-m", board], stderr=subprocess.STDOUT)
     if command == "u":
-        subprocess.call(["ino", "upload"], stderr=subprocess.STDOUT)
+        subprocess.call(["ino", "upload", "-m", board], stderr=subprocess.STDOUT)
     if command == "s":
         subprocess.call(["ino", "serial", "-b", "115200"], stderr=subprocess.STDOUT)
