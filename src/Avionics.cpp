@@ -39,7 +39,7 @@ void Avionics::setup() {
 
     motor_roll_plus->write(MOTOR_ZERO);
     motor_roll_minus->write(MOTOR_ZERO);
-    // delay(2000);
+    delay(2000);
 
     Serial.println("ESCs Started");
 
@@ -58,7 +58,7 @@ void Avionics::update() {
 	vAcc_Output = 47;
 	imu->getEuler(ypr);
     // Pitch, yaw, roll
-    
+
     // Serial.print(sensors->accel.x);
     // Serial.print("  ,  ");
     // Serial.print(sensors->accel.y);
@@ -73,6 +73,10 @@ void Avionics::update() {
     Serial.print(ypr[2]);
     Serial.print("  ,  ");
     Serial.println();
+
+    // Try control by nested PID
+    // [euler angle, target angle] -> pitchPID
+    // [gyro_rate, pitchPIDOutput] -> pitchRatePID -> motor (one per motor)
 
 	// pitch_Input = sensors->pitch;
 	// roll_Input = sensors->roll;
