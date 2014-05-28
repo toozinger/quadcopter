@@ -192,7 +192,6 @@ void Sensors::readSensors() {
 			        accel.z = (((int16_t) buff[5]) << 8) | buff[4];    // Z axis (internal sensor z axis)
 			        accel.z -= ACCEL_Z_OFFSET;
 			        accel.z *= ACCEL_Z_SCALE;
-			        
 			    } else {
 		    		Serial.println("Accel Error");
 		    	}

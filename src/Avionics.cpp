@@ -44,54 +44,64 @@ void Avionics::setup() {
     Serial.println("ESCs Started");
 
     // Setup PIDs
-    pitchPID = new PID(&pitch_Input, &pitch_Output, &pitch_Setpoint, 4.0, 1.0, 0.5, DIRECT);
+    pitchPID = new PID(&pitch_Input, &pitch_Output, &pitch_Setpoint, 8.0, 2.0, 0, DIRECT);
     pitchPID->SetSampleTime(5);
     pitchPID->SetMode(AUTOMATIC);
-    pitchPID->SetOutputLimits(-10.0,10.0);
+    pitchPID->SetOutputLimits(-20,20);
     pitch_Output = 0;
-	pitch_Setpoint = 0;
+    pitch_Setpoint = 0;
+
 }
 
-float ypr[3];
+float euler[3];
 
 void Avionics::update() {
-	vAcc_Output = 47;
-	imu->getEuler(ypr);
-    // Pitch, yaw, roll
-
-    // Serial.print(sensors->accel.x);
-    // Serial.print("  ,  ");
-    // Serial.print(sensors->accel.y);
-    // Serial.print("  ,  ");
-    // Serial.print(sensors->accel.z);
-    // Serial.print("  ,  ");
-    // Serial.println();
-    Serial.print(ypr[0]);
-    Serial.print("  ,  ");
-    Serial.print(ypr[1]);
-    Serial.print("  ,  ");
-    Serial.print(ypr[2]);
-    Serial.print("  ,  ");
-    Serial.println();
+	imu->getYawPitchRollRad(euler);
+    // Yaw, roll, pitch
 
     // Try control by nested PID
     // [euler angle, target angle] -> pitchPID
     // [gyro_rate, pitchPIDOutput] -> pitchRatePID -> motor (one per motor)
 
-	// pitch_Input = sensors->pitch;
-	// roll_Input = sensors->roll;
+	 pitch_Input = euler[2];
+     pitch_Setpoint = 0;
+
+     Serial.print(euler[0]);
+     Serial.print(" , ");
+     Serial.print(euler[1]);
+     Serial.print(" , ");
+     Serial.print(euler[2]);
+     Serial.println();
+ //    pitch_Output = 0;
+
+
+ //    if (pitchPID->Compute()) {
+ //        pitchMinus_Setpoint = pitch_Output;
+ //        pitchPlus_Setpoint = pitch_Output;
+
+ //        pitchMinus_Input = sensors->gyro.x;
+ //        pitchPlus_Input = -sensors->gyro.x;
+
+ //        if (pitchMinusPID->Compute()){
+ //            motor_pitch_minus->write(pitchMinus_Output);
+ //        }
+
+ //        if (pitchPlusPID->Compute()){
+ //            motor_pitch_plus->write(pitchPlus_Output);
+ //        }
+ //        // Serial.print(pitchMinus_Output);
+ //        // Serial.print(":");
+ //        // Serial.println(pitchPlus_Output);
+ //    }
 
 
 	// Slow correction
 
 	// if (pitchPID->Compute()) {
-	// 	if (fabs(pitch_Input - pitch_Setpoint) < TO_RAD(5)) { // 
-	// 		pitch_Output *= 0.5;
-	// 	}
 	// 	Serial.print("In: "); Serial.print(pitch_Input);
 	// 	Serial.print(";    Out: ");Serial.println(pitch_Output);
-	// 	// motor_pitch_plus->write(vAcc_Output + pitch_Output);
-	// 	// motor_pitch_minus->write(vAcc_Output - pitch_Output);
+	// 	motor_pitch_plus->write(47 + pitch_Output);
+	// 	motor_pitch_minus->write(47 - pitch_Output);
 
 	// 	// motor_roll_minus->write(vAcc_Output);
 	// 	// motor_roll_plus->write(vAcc_Output);

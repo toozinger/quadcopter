@@ -292,7 +292,7 @@ void FreeIMU::AHRSupdate(float gx, float gy, float gz, float ax, float ay,
 	q3q3 = q3 * q3;
 
 // Use magnetometer measurement only when valid (avoids NaN in magnetometer normalization)
-	if ((mx != 0.0f) && (my != 0.0f) && (mz != 0.0f)) {
+	if ((mx != 0.0f) && (my != 0.0f) && (mz != 0.0f) && !isnan(mx) && !isnan(my) && !isnan(mz)) {
 		float hx, hy, bx, bz;
 		float halfwx, halfwy, halfwz;
 
@@ -320,13 +320,13 @@ void FreeIMU::AHRSupdate(float gx, float gy, float gz, float ax, float ay,
 		halfwz = bx * (q0q2 + q1q3) + bz * (0.5f - q1q1 - q2q2);
 
 		// Error is sum of cross product between estimated direction and measured direction of field vectors
-		halfex = (my * halfwz - mz * halfwy);
-		halfey = (mz * halfwx - mx * halfwz);
-		halfez = (mx * halfwy - my * halfwx);
+		// halfex = (my * halfwz - mz * halfwy);
+		// halfey = (mz * halfwx - mx * halfwz);
+		// halfez = (mx * halfwy - my * halfwx);
 	}
 
 // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalization)
-	if ((ax != 0.0f) && (ay != 0.0f) && (az != 0.0f)) {
+	if ((ax != 0.0f) && (ay != 0.0f) && (az != 0.0f) && !isnan(ax) && !isnan(ay) && !isnan(az)) {
 		float halfvx, halfvy, halfvz;
 
 		// Normalize accelerometer measurement
@@ -347,7 +347,7 @@ void FreeIMU::AHRSupdate(float gx, float gy, float gz, float ax, float ay,
 	}
 
 // Apply feedback only when valid data has been gathered from the accelerometer or magnetometer
-	if (halfex != 0.0f && halfey != 0.0f && halfez != 0.0f) {
+	if (halfex != 0.0f && halfey != 0.0f && halfez != 0.0f && !isnan(halfex) && !isnan(halfey) && !isnan(halfez)) {
 		// Compute and apply integral feedback if enabled
 		if (twoKi > 0.0f) {
 			integralFBx += twoKi * halfex * (1.0f / sampleFreq); // integral error scaled by Ki
@@ -398,7 +398,7 @@ void FreeIMU::getQ(float * q) {
 	getValues(val);
 
 	now = millis();
-	if (lastUpdate > 0) {
+	if (lastUpdate > 0 && now != lastUpdate) {
 		sampleFreq = 1.0 / ((now - lastUpdate) / 1000.0);
 
 // gyro values are expressed in deg/sec, the * M_PI/180 will convert it to radians/sec
@@ -448,22 +448,6 @@ void FreeIMU::getEulerRad(float * angles) {
 	angles[1] = -asin(2 * q[1] * q[3] + 2 * q[0] * q[2]); // theta
 	angles[2] = atan2(2 * q[2] * q[3] - 2 * q[0] * q[1],
 			2 * q[0] * q[0] + 2 * q[3] * q[3] - 1); // phi
-
-	if (fabs(eulerLastX-angles[0]) > 6) {
-		eulerRotX += (eulerLastX > 0 ? 1 : -1);
-	}
-	if (fabs(eulerLastY-angles[1]) > 6) {
-		eulerRotY += (eulerLastY > 0 ? 1 : -1);
-	}
-	if (fabs(eulerLastZ-angles[2]) > 6) {
-		eulerRotZ += (eulerLastZ > 0 ? 1 : -1);
-	}
-	eulerLastX = angles[0];
-	eulerLastY = angles[1];
-	eulerLastZ = angles[2];
-	angles[0] += 6.28*eulerRotX;
-	angles[1] += 6.28*eulerRotY;
-	angles[2] += 6.28*eulerRotZ;
 }
 
 /**
@@ -501,6 +485,22 @@ void FreeIMU::getYawPitchRollRad(float * ypr) {
 			2 * q[0] * q[0] + 2 * q[1] * q[1] - 1);
 	ypr[1] = atan(gx / sqrt(gy * gy + gz * gz));
 	ypr[2] = atan(gy / sqrt(gx * gx + gz * gz));
+
+	if (fabs(eulerLastX-ypr[0]) > 6) {
+		eulerRotX += (eulerLastX > 0 ? 1 : -1);
+	}
+	if (fabs(eulerLastY-ypr[1]) > 6) {
+		eulerRotY += (eulerLastY > 0 ? 1 : -1);
+	}
+	if (fabs(eulerLastZ-ypr[2]) > 6) {
+		eulerRotZ += (eulerLastZ > 0 ? 1 : -1);
+	}
+	eulerLastX = ypr[0];
+	eulerLastY = ypr[1];
+	eulerLastZ = ypr[2];
+	ypr[0] += 6.28*eulerRotX;
+	ypr[1] += 6.28*eulerRotY;
+	ypr[2] += 6.28*eulerRotZ;
 }
 
 /**
@@ -532,16 +532,17 @@ void arr3_rad_to_deg(float * arr) {
  * @see http://en.wikipedia.org/wiki/Fast_inverse_square_root
  */
 float invSqrt(float number) {
-	volatile long i;
-	volatile float x, y;
-	volatile const float f = 1.5F;
+	return pow(number, -0.5);
+	// volatile long i;
+	// volatile float x, y;
+	// volatile const float f = 1.5F;
 
-	x = number * 0.5F;
-	y = number;
-	i = *(long *) &y;
-	i = 0x5f375a86 - (i >> 1);
-	y = *(float *) &i;
-	y = y * (f - (x * y * y));
-	return y;
+	// x = number * 0.5F;
+	// y = number;
+	// i = *(long *) &y;
+	// i = 0x5f375a86 - (i >> 1);
+	// y = *(float *) &i;
+	// y = y * (f - (x * y * y));
+	// return y;
 }
 

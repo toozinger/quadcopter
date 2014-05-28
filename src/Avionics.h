@@ -25,11 +25,6 @@ public:
 	double pitch_Input;
 	double pitch_Output;
 
-	PID *rollPID;
-	double roll_Input;
-	double roll_Output;
-
-	PID *vAccPID;
 	double vAcc_Input;
 	double vAcc_Output;
 
